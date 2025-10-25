@@ -298,6 +298,71 @@ app.get(
 );
 
 // ========================================
+// ENDPOINT 6 : PUT /change-password
+// ========================================
+app.put("/change-password", authenticate, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({
+        error: "Ancien et nouveau mot de passe requis",
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        error: "Le nouveau mot de passe doit contenir au moins 8 caractères",
+      });
+    }
+
+    // Récupérer l'utilisateur actuel
+    const { data: user } = await supabase
+      .from("users")
+      .select("password")
+      .eq("id", req.user.id)
+      .single();
+
+    if (!user) {
+      return res.status(404).json({ error: "Utilisateur non trouvé" });
+    }
+
+    // Vérifier l'ancien mot de passe
+    const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
+
+    if (!isOldPasswordValid) {
+      return res.status(401).json({ error: "Ancien mot de passe incorrect" });
+    }
+
+    // Hasher le nouveau mot de passe
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Mettre à jour le mot de passe ET password_changed_at
+    const { error } = await supabase
+      .from("users")
+      .update({
+        password: hashedPassword,
+        password_changed_at: new Date().toISOString(),
+      })
+      .eq("id", req.user.id);
+
+    if (error) {
+      console.error("Erreur Supabase:", error);
+      return res.status(500).json({ error: "Erreur lors de la mise à jour" });
+    }
+
+    res.json({
+      message:
+        "Mot de passe changé avec succès. Tous vos tokens JWT sont maintenant invalides. Veuillez vous reconnecter.",
+      warning: "Les API Keys restent valides.",
+    });
+  } catch (error) {
+    console.error("Erreur serveur:", error);
+    res.status(500).json({ error: "Erreur interne du serveur" });
+  }
+});
+
+// ========================================
 // PARTIE 5 : API KEYS
 // ========================================
 
@@ -833,6 +898,7 @@ app.listen(PORT, () => {
   console.log(`\n🔐 Authentification (JWT ou API Key):`);
   console.log(`   - GET  /my-user`);
   console.log(`   - GET  /users (ADMIN)`);
+  console.log(`   - PUT  /change-password`);
   console.log(`\n🔑 API Keys:`);
   console.log(`   - POST   /api-keys (créer)`);
   console.log(`   - GET    /api-keys (lister)`);
