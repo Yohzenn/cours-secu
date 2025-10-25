@@ -354,7 +354,6 @@ app.put("/change-password", authenticate, async (req, res) => {
     res.json({
       message:
         "Mot de passe changé avec succès. Tous vos tokens JWT sont maintenant invalides. Veuillez vous reconnecter.",
-      warning: "Les API Keys restent valides.",
     });
   } catch (error) {
     console.error("Erreur serveur:", error);
